@@ -27,12 +27,11 @@ if ("bluetooth" in navigator) {
   });
   // else the browser doesn't support bluetooth
 } else {
-  msg("Browser not supported"); bigButton.style.backgroundColor = "red";
+  msg("Browser not supported");
   alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
 }
 
 async function connect() {
-  bigButton.style.backgroundColor="grey";
   msg('Requesting device ...');
 
   const device = await navigator.bluetooth.requestDevice({
