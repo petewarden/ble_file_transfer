@@ -1,1 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BLE File Transfer Example</title>
+</head>
+<body>
+  <div>
+    <button id="connect-button">Connect</button>
+    <button id="transfer-file-button">Transfer File</button>
+    <div id="status-label">Click button to connect to the board</div>
+  </div>  
+</body>
+   <script type="text/javascript">
+const SERVICE_UUID = 'bf88b656-0000-4a61-86e0-769c741026c0';
+const FILE_BLOCK_UUID = 'bf88b656-3000-4a61-86e0-769c741026c0';
+const connectButton = document.getElementById('connect-button');
+const transferFileButton = document.getElementById('transfer-file-button');
+const statusElement = document.getElementById('status-label');
+var fileBlockCharacteristic = null;
 
+function msg(m){
+  statusElement.innerHTML = m;
+}
+     
+if ("bluetooth" in navigator) {
+  connectButton.addEventListener('click', function(event) {
+    connect();
+  });
+  // else the browser doesn't support bluetooth
+} else {
+  msg("Browser not supported");
+  alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
+}
+
+async function connect() {
+  msg('Requesting device ...');
+
+  const device = await navigator.bluetooth.requestDevice({
+    filters: [{services: [SERVICE_UUID]}]
+  });
+
+  
+  msg('Connecting to device ...');
+  function onDisconnected(event) {
+    msg('Device ' + device.name + ' is disconnected.');
+  }
+  device.addEventListener('gattserverdisconnected', onDisconnected);
+  const server = await device.gatt.connect();
+
+  msg('Getting primary service ...');
+  const service = await server.getPrimaryService(SERVICE_UUID);
+  
+  msg('Getting characteristic ...');
+  fileBlockCharacteristic = await service.getCharacteristic(FILE_BLOCK_UUID);
+  
+  transferFileButton.addEventListener('click', function(event) {
+    msg('Trying to write file ...');
+    transferFile(30 * 1024);
+  });
+  
+  msg('Connected to device');
+}
+
+async function transferFile(bytesRemaining) {
+  console.log('a');
+  console.log(bytesRemaining);
+  const blockLen = 128;
+  var blockBuffer = new ArrayBuffer(blockLen);
+  var blockView = new Uint8Array(blockBuffer);
+  console.log('b');
+  const contentString = 'The quick brown fox jumped over the lazy dog';
+  for (var i = 0; i < blockLen; ++i) {
+    var contentIndex = (i % contentString.length);
+    blockView[i] = contentString.charCodeAt(contentIndex);
+  }
+  console.log('c');
+  fileBlockCharacteristic.writeValue(blockBuffer)
+  .then(_ => {
+    console.log('d');
+    bytesRemaining -= blockLen;
+    msg('File block written - ' + bytesRemaining +' bytes remaining');
+    if (bytesRemaining > 0) {
+      console.log('e');
+      transferFile(bytesRemaining);
+    }
+  })
+  .catch(error => {
+    console.log(error);
+    msg('File block write error with ' + bytesRemaining + ' bytes remaining, see console');
+  });
+  console.log('f');
+}
+  </script>
+</html>
