@@ -38,7 +38,11 @@ async function connect() {
     filters: [{services: [SERVICE_UUID]}]
   });
 
+  
   msg('Connecting to device ...');
+  function onDisconnected(event) {
+    msg('Device ' + device.name + ' is disconnected.');
+  }
   device.addEventListener('gattserverdisconnected', onDisconnected);
   const server = await device.gatt.connect();
 
