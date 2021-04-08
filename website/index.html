@@ -54,14 +54,14 @@ async function connect() {
   fileBlockCharacteristic = await service.getCharacteristic(FILE_BLOCK_UUID);
   
   transferFileButton.addEventListener('click', function(event) {
-    transferFile();
+    msg('Trying to write file ...');
+    transferFile(30 * 1024);
   });
   
   msg('Connected to device');
 }
 
-async function transferFile() {
-  msg('Trying to write file block ...');
+async function transferFile(bytesRemaining) {
   const blockLen = 320;
   var blockBuffer = new ArrayBuffer(blockLen);
   var blockView = new Uint8Array(blockBuffer);
@@ -72,11 +72,15 @@ async function transferFile() {
   }
   fileBlockCharacteristic.writeValue(blockBuffer)
   .then(_ => {
-    msg('File block written');
+    bytesRemaining -= blockLen;
+    msg('File block written - ' + bytesRemaining +' bytes remaining');
+    if (bytesRemaining > 0) {
+      transferFile(bytesRemaining);
+    }
   })
   .catch(error => {
     console.log(error);
-    msg('File block write error, see console');
+    msg('File block write error with ' + bytesRemaining + ' bytes remaining, see console');
   });
 }
   </script>
