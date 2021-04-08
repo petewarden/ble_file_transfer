@@ -5,6 +5,15 @@
 </head>
 <body>
   <div>
+    Test file transfer over BLE. To use:
+    <ul>
+      <li>Flash an Arduino Nano BLE Sense board with <a href="https://github.com/petewarden/ble_file_transfer">the test sketch</a>.</li>
+      <li>Click the connect button and pair with the board.</li>
+      <li>Press the transfer file button.</li>
+    </ul>
+    You should see the bytes remaining count down, and then a 'File transfer complete' message at the end.
+  </div>
+  <div>
     <button id="connect-button">Connect</button>
     <button id="transfer-file-button">Transfer File</button>
     <div id="status-label">Click button to connect to the board</div>
@@ -62,33 +71,28 @@ async function connect() {
 }
 
 async function transferFile(bytesRemaining) {
-  console.log('a');
-  console.log(bytesRemaining);
   const blockLen = 128;
   var blockBuffer = new ArrayBuffer(blockLen);
   var blockView = new Uint8Array(blockBuffer);
-  console.log('b');
   const contentString = 'The quick brown fox jumped over the lazy dog';
   for (var i = 0; i < blockLen; ++i) {
     var contentIndex = (i % contentString.length);
     blockView[i] = contentString.charCodeAt(contentIndex);
   }
-  console.log('c');
   fileBlockCharacteristic.writeValue(blockBuffer)
   .then(_ => {
-    console.log('d');
     bytesRemaining -= blockLen;
     msg('File block written - ' + bytesRemaining +' bytes remaining');
     if (bytesRemaining > 0) {
-      console.log('e');
       transferFile(bytesRemaining);
+    } else {
+      msg('File transfer complete');
     }
   })
   .catch(error => {
     console.log(error);
     msg('File block write error with ' + bytesRemaining + ' bytes remaining, see console');
   });
-  console.log('f');
 }
   </script>
 </html>
