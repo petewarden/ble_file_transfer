@@ -62,7 +62,7 @@ async function connect() {
 
 async function transferFile() {
   msg('Trying to write file block ...');
-  const blockLen = 512;
+  const blockLen = 480;
   var blockBuffer = new ArrayBuffer(blockLen);
   var blockView = new Uint8Array(blockBuffer);
   const contentString = 'The quick brown fox jumped over the lazy dog';
