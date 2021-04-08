@@ -1,1 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BLE File Transfer Example</title>
+</head>
+<body>
+  <div>
+    <button id="connect-button">Connect</button>
+    <button id="transfer-file-button">Transfer File</button>
+    <div id="status-label">Click button to connect to the board</div>
+  </div>  
+</body>
+   <script type="text/javascript">
+const SERVICE_UUID = 'bf88b656-0000-4a61-86e0-769c741026c0';
+const FILE_BLOCK_UUID = 'bf88b656-3000-4a61-86e0-769c741026c0';
+const connectButton = document.getElementById('connect-button');
+const transferFileButton = document.getElementById('transfer-file-button');
+const statusElement = document.getElementById('status-label');
 
+function msg(m){
+  statusElement.innerHTML = m;
+}
+     
+if ("bluetooth" in navigator) {
+  connectButton.addEventListener('click', function(event) {
+    connect();
+  });
+  // else the browser doesn't support bluetooth
+} else {
+  msg("Browser not supported"); bigButton.style.backgroundColor = "red";
+  alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
+}
+
+async function connect() {
+  bigButton.style.backgroundColor="grey";
+  msg('Requesting device ...');
+
+  const device = await navigator.bluetooth.requestDevice({
+    filters: [{services: [SERVICE_UUID]}]
+  });
+
+  msg('Connecting to device ...');
+  device.addEventListener('gattserverdisconnected', onDisconnected);
+  const server = await device.gatt.connect();
+
+  msg('Getting primary service ...');
+  const service = await server.getPrimaryService(SERVICE_UUID);
+  
+  msg('Getting characteristic ...');
+  fileBlockCharacteristic = await service.getCharacteristic(FILE_BLOCK_UUID);
+  
+  transferFileButton.addEventListener('click', function(event) {
+    transferFile();
+  });
+}
+
+async function transferFile() {
+  msg('Trying to write file block ...');
+  fileBlockharacteristic.writeValue('The quick brown fox jumped over the lazy dog')
+  .then(_ => {
+    msg('File block written');
+  })
+  .catch(error => {
+    console.log(error);
+    msg('File block write error, see console');
+  });
+}
+  </script>
+</html>
