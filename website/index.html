@@ -62,7 +62,15 @@ async function connect() {
 
 async function transferFile() {
   msg('Trying to write file block ...');
-  fileBlockCharacteristic.writeValue('The quick brown fox jumped over the lazy dog')
+  const blockLen = 128;
+  var blockBuffer = new ArrayBuffer(blockLen);
+  var blockView = new Uint8Array(blockBuffer);
+  const contentString = 'The quick brown fox jumped over the lazy dog';
+  for (var i = 0; i < blockLen; ++i) {
+    var contentIndex = (i % contentString.length);
+    blockView[i] = contentString.charCodeAt(contentIndex);
+  }
+  fileBlockCharacteristic.writeValue(blockBuffer)
   .then(_ => {
     msg('File block written');
   })
