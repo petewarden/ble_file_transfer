@@ -16,6 +16,7 @@ const FILE_BLOCK_UUID = 'bf88b656-3000-4a61-86e0-769c741026c0';
 const connectButton = document.getElementById('connect-button');
 const transferFileButton = document.getElementById('transfer-file-button');
 const statusElement = document.getElementById('status-label');
+var fileBlockCharacteristic = null;
 
 function msg(m){
   statusElement.innerHTML = m;
@@ -55,6 +56,8 @@ async function connect() {
   transferFileButton.addEventListener('click', function(event) {
     transferFile();
   });
+  
+  msg('Connected to device');
 }
 
 async function transferFile() {
