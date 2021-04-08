@@ -16,7 +16,7 @@ limitations under the License.
 
 namespace {
 
-constexpr int32_t file_block_byte_count = 320;
+constexpr int32_t file_block_byte_count = 512;
 uint8_t file_block_buffer[file_block_byte_count] = {};
   
 const int VERSION = 0x00000000;
@@ -26,11 +26,23 @@ String name;
 
 void on_file_block_written(BLEDevice central, BLECharacteristic characteristic) {
   const int32_t file_block_length = characteristic.valueLength();
-  Serial.print("Data received: length = ");
-  Serial.println(file_block_length);
+//  Serial.print("Data received: length = ");
+//  Serial.println(file_block_length);
   
   characteristic.readValue(file_block_buffer, file_block_length);
-  Serial.println(file_block_length);
+
+  char string_buffer[file_block_byte_count + 1];
+  for (int i = 0; i < file_block_length; ++i) {
+    unsigned char value = file_block_buffer[i];
+//    Serial.print(value);
+//    Serial.print(',');
+    if (i < file_block_byte_count) {
+      string_buffer[i] = value;
+    }
+  }
+  string_buffer[file_block_byte_count] = 0;
+//  Serial.println("");
+//  Serial.println(String(string_buffer));
 }
 
 }  // namespace
@@ -53,7 +65,7 @@ void setup() {
 
   address.toUpperCase();
 
-  name = "BLESense-";
+  name = "FileTransferExample-";
   name += address[address.length() - 5];
   name += address[address.length() - 4];
   name += address[address.length() - 2];
