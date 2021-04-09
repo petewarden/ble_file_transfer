@@ -93,17 +93,19 @@ async function transferFile(fileLength) {
     msg("File length is too long");
   }
   
-  await fileLengthCharacteristic.writeValue(fileLength);
+  let fileLengthArray = Int32Array.of(fileLength);
+  await fileLengthCharacteristic.writeValue(fileLengthArray);
   let fileChecksum = computeChecksum();
-  await fileChecksumCharacteristic.writeValue(fileChecksum);
+  let fileChecksumArray = Uint32Array.of(fileChecksum);
+  await fileChecksumCharacteristic.writeValue(fileChecksumArray);
   
-  await commandCharacteristic.writeValue(1);
+  let commandArray = Int32Array.of(1);
+  await commandCharacteristic.writeValue(commandArray);
   
-  let errorStatus = await errorStatusCharacteristic.readValue();
+  let errorStatus = await errorStatusCharacteristic.readValue().getInt32(0);
   if (errorStatus !== 0) {
     let errorMessage = await errorMessageCharacteristic.readValue();
-    console.log("Error: " + errorMessage);
-    msg(errorMessage);
+    console.log("Error: ", errorMessage);
   }
   
   sendFileBlock(fileLength);
