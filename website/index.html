@@ -22,6 +22,13 @@
    <script type="text/javascript">
 const SERVICE_UUID = 'bf88b656-0000-4a61-86e0-769c741026c0';
 const FILE_BLOCK_UUID = 'bf88b656-3000-4a61-86e0-769c741026c0';
+const FILE_LENGTH_UUID = 'bf88b656-3001-4a61-86e0-769c741026c0';
+const FILE_MAXIMUM_LENGTH_UUID = 'bf88b656-3002-4a61-86e0-769c741026c0';
+const FILE_CHECKSUM_UUID = 'bf88b656-3003-4a61-86e0-769c741026c0';
+const COMMAND_UUID = 'bf88b656-3004-4a61-86e0-769c741026c0';
+const ERROR_STATUS_UUID = 'bf88b656-3005-4a61-86e0-769c741026c0';
+const ERROR_MESSAGE_UUID = 'bf88b656-3006-4a61-86e0-769c741026c0';
+     
 const connectButton = document.getElementById('connect-button');
 const transferFileButton = document.getElementById('transfer-file-button');
 const statusElement = document.getElementById('status-label');
@@ -59,8 +66,14 @@ async function connect() {
   msg('Getting primary service ...');
   const service = await server.getPrimaryService(SERVICE_UUID);
   
-  msg('Getting characteristic ...');
+  msg('Getting characteristics ...');
   fileBlockCharacteristic = await service.getCharacteristic(FILE_BLOCK_UUID);
+  fileLengthCharacteristic = await service.getCharacteristic(FILE_LENGTH_UUID);
+  fileMaximumLengthCharacteristic = await service.getCharacteristic(FILE_MAXIMUM_LENGTH_UUID);
+  fileChecksumCharacteristic = await service.getCharacteristic(FILE_CHECKSUM_UUID);
+  commandCharacteristic = await service.getCharacteristic(COMMAND_UUID);
+  errorStatusCharacteristic = await service.getCharacteristic(ERROR_STATUS_UUID);
+  errorMessageCharacteristic = await service.getCharacteristic(ERROR_MESSAGE_UUID);
   
   transferFileButton.addEventListener('click', function(event) {
     msg('Trying to write file ...');
@@ -70,7 +83,33 @@ async function connect() {
   msg('Connected to device');
 }
 
-async function transferFile(bytesRemaining) {
+function computeChecksum() {
+  return 0;
+}
+     
+async function transferFile(fileLength) {
+  let maximumLength = fileMaximumLengthCharacteristic.readValue();
+  if (fileLength > maximumLength) {
+    msg("File length is too long");
+  }
+  
+  await fileLengthCharacteristic.writeValue(fileLength);
+  let fileChecksum = computeChecksum();
+  await fileChecksumCharacteristic.writeValue(fileChecksum);
+  
+  await commandCharacteristic.writeValue(1);
+  
+  let errorStatus = await errorStatusCharacteristic.readValue();
+  if (errorStatus !== 0) {
+    let errorMessage = await errorMessageCharacteristic.readValue();
+    console.log("Error: " + errorMessage);
+    msg(errorMessage);
+  }
+  
+  sendFileBlock(fileLength);
+}
+     
+async function sendFileBlock(bytesRemaining) {
   const blockLen = 128;
   var blockBuffer = new ArrayBuffer(blockLen);
   var blockView = new Uint8Array(blockBuffer);
@@ -84,7 +123,7 @@ async function transferFile(bytesRemaining) {
     bytesRemaining -= blockLen;
     msg('File block written - ' + bytesRemaining +' bytes remaining');
     if (bytesRemaining > 0) {
-      transferFile(bytesRemaining);
+      sendFileBlock(bytesRemaining);
     } else {
       msg('File transfer complete');
     }
