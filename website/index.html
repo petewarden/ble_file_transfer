@@ -102,8 +102,8 @@ async function transferFile(fileLength) {
   let commandArray = Int32Array.of(1);
   await commandCharacteristic.writeValue(commandArray);
   
-  let errorStatus = await errorStatusCharacteristic.readValue().getInt32(0);
-  if (errorStatus !== 0) {
+  let errorStatus = await errorStatusCharacteristic.readValue();
+  if (errorStatus.getInt32(0) !== 0) {
     let errorMessage = await errorMessageCharacteristic.readValue();
     console.log("Error: ", errorMessage);
   }
