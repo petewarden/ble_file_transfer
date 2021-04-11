@@ -149,7 +149,6 @@ async function sendFileBlock(fileContents, bytesAlreadySent) {
   var copyBlockBuffer = new ArrayBuffer(blockLength);
   var copyBlockView = new Uint8Array(copyBlockBuffer);
   for (var i = 0; i < blockLength; ++i) {
-    console.log(originalBlockView[i]);
     copyBlockView[i] = originalBlockView[i];
   }
   fileBlockCharacteristic.writeValue(copyBlockView)
