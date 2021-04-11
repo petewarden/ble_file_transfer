@@ -97,7 +97,7 @@ async function connect() {
   fileMaximumLengthCharacteristic = await service.getCharacteristic(FILE_MAXIMUM_LENGTH_UUID);
   fileChecksumCharacteristic = await service.getCharacteristic(FILE_CHECKSUM_UUID);
   commandCharacteristic = await service.getCharacteristic(COMMAND_UUID);
-  transferStatusCharacteristic = await service.getCharacteristic(ERROR_STATUS_UUID);
+  transferStatusCharacteristic = await service.getCharacteristic(TRANSFER_STATUS_UUID);
   await transferStatusCharacteristic.startNotifications();
   transferStatusCharacteristic.addEventListener('characteristicvaluechanged', onTransferStatusChanged);
   errorMessageCharacteristic = await service.getCharacteristic(ERROR_MESSAGE_UUID);
