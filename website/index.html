@@ -83,6 +83,17 @@ async function connect() {
   msg('Connected to device');
 }
 
+function prepareDummyFileContents(fileLength) {
+  let result = ArrayBuffer(fileLength);
+  let bytes = UInt8Array(result);
+  const contentString = 'The quick brown fox jumped over the lazy dog';
+  for (var i = 0; i < bytes.length; ++i) {
+    var contentIndex = (i % bytes.length);
+    bytes[i] = contentString.charCodeAt(contentIndex);
+  }
+  return result;
+}
+     
 function computeChecksum() {
   return 0;
 }
@@ -108,19 +119,18 @@ async function transferFile(fileLength) {
     console.log("Error: ", errorMessage);
   }
   
-  sendFileBlock(fileLength);
+  let fileContents = prepareDummyFileContents(fileLength);
+  
+  sendFileBlock(fileContents, 0);
 }
      
-async function sendFileBlock(bytesRemaining) {
-  const blockLen = 128;
-  var blockBuffer = new ArrayBuffer(blockLen);
-  var blockView = new Uint8Array(blockBuffer);
-  const contentString = 'The quick brown fox jumped over the lazy dog';
-  for (var i = 0; i < blockLen; ++i) {
-    var contentIndex = (i % contentString.length);
-    blockView[i] = contentString.charCodeAt(contentIndex);
-  }
-  fileBlockCharacteristic.writeValue(blockBuffer)
+async function sendFileBlock(fileContents, bytesAlreadySent) {
+  const bytesRemaining = fileContents.length - bytesAlreadySent;
+  
+  const maxBlockLength = 128;
+  const blockLength = Math.min(bytesRemaining, maxBlockLength);
+  var blockView = new Uint8Array(fileContents, bytesAlreadySent, blockLength);
+  fileBlockCharacteristic.writeValue(blockView)
   .then(_ => {
     bytesRemaining -= blockLen;
     msg('File block written - ' + bytesRemaining +' bytes remaining');
