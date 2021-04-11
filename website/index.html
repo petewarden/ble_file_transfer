@@ -53,7 +53,7 @@ async function onTransferSuccess() {
   isFileTransferInProgress = false;
   let checksumValue = await fileChecksumCharacteristic.readValue();
   let checksumArray = new Uint32Array(checksumValue.buffer);
-  let checksum = ChecksumArray[0];
+  let checksum = checksumArray[0];
   msg('File transfer succeeded: Checksum 0x' + checksum.toString(16));
 }
 
