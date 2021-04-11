@@ -149,6 +149,14 @@ function crc32(data) {
   }
   return crc;
 }
+     
+function testCrc32() {
+  const testArray = [97, 98, 99, 100, 101];
+  const testArrayCrc32 = crc32(testArray);
+  console.log('CRC32 for [97, 98, 99, 100, 101] is 0x' + testArrayCrc32.toString(16) + ' (' + testArrayCrc32 + ')');
+}
+
+testCrc32();
 
 async function transferFile(fileLength) {
   let maximumLength = fileMaximumLengthCharacteristic.readValue();
