@@ -115,7 +115,7 @@ async function connect() {
 function prepareDummyFileContents(fileLength) {
   let result = new ArrayBuffer(fileLength);
   let bytes = new Uint8Array(result);
-  const contentString = 'The quick brown fox jumped over the lazy dog';
+  const contentString = 'The quick brown fox jumped over the lazy dog. ';
   for (var i = 0; i < bytes.length; ++i) {
     var contentIndex = (i % contentString.length);
     bytes[i] = contentString.charCodeAt(contentIndex);
