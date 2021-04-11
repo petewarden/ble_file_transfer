@@ -120,6 +120,7 @@ A more detailed flow is:
  - When the client has a file to send, it first writes the file length and CRC32 checksum to characteristics on the device.
  - Then it starts a file transfer by writing an integer of 1 to the command characteristic.
  - The device then expects the client to repeatedly write sequential blocks of 128 bytes or less to the file block characteristic, waiting until one has been acknowledged before sending the next.
+ - The client assembles these blocks into a contiguous array of data.
  - Once the expected number of bytes has been received, the device confirms the checksum matches the one supplied by the client, and then calls the onBLEFileReceived function with the received data.
  - The client is notified that the file transfer succeeded through a notification of the transfer code as 0.
  
