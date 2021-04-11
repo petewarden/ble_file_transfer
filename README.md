@@ -134,3 +134,7 @@ It's possible to cancel an in-progress transfer if the client writes a value of 
  - Chrome on Android supports WebBLE, but the transfer speeds seem very slow compared to Chrome desktop.
  - There are almost certainly a lot of tricky race conditions, security holes and other edge cases this protocol doesn't handle.
  - Related to the above, there are very few tests in this initial version.
+
+## Thanks
+
+This code wouldn't be possible without Dominic Pajak, Sandeep Mistry, and many of the other Google and Arduino people who've helped!
