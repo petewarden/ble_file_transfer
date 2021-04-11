@@ -49,7 +49,9 @@ if ("bluetooth" in navigator) {
 }
 
 function onTransferSuccess() {
-  let checksum = fileChecksumCharacteristic.readValue();
+  let checksumValue = await fileChecksumCharacteristic.readValue();
+  let checksumArray = new Uint32Array(checksumValue);
+  let checksum = ChecksumArray[0];
   msg('File transfer succeeded: Checksum 0x' + checksum.toString(16));
 }
 
@@ -163,7 +165,9 @@ function testCrc32() {
 }
 
 async function transferFile(fileLength) {
-  let maximumLength = fileMaximumLengthCharacteristic.readValue();
+  let maximumLengthValue = await fileMaximumLengthCharacteristic.readValue();
+  let maximumLengthArray = new UintArray(maximumLengthValue);
+  let maximumLength = maximumLengthArray[0];
   if (fileLength > maximumLength) {
     msg("File length is too long");
   }
