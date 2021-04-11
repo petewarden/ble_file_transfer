@@ -44,12 +44,13 @@ if ("bluetooth" in navigator) {
   });
   // else the browser doesn't support bluetooth
 } else {
-  msg("Browser not supported");
-  alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
+  msg('Browser not supported');
+  alert('Error: This browser doesn't support Web Bluetooth. Try using Chrome.');
 }
 
 function onTransferSuccess() {
-  msg("File transfer succeeded");
+  let checksum = fileChecksumCharacteristic.readValue();
+  msg('File transfer succeeded: Checksum 0x' + checksum.toString(16));
 }
 
 function onTransferError() {
