@@ -131,7 +131,8 @@ function crc32ForByte(r) {
   return r ^ 0xff000000;
 }
 
-function crc32(data) {
+function crc32(dataIterable) {
+  let data = ArrayBuffer(dataIterable);
   const tableSize = 256;
   if (!window.crc32Table) {
     crc32Table = new Uint32Array(tableSize);
