@@ -49,12 +49,12 @@ if ("bluetooth" in navigator) {
 }
 
 function onErrorStatusChanged(event) {
-  let value = Uint32Array(event.target.value);
+  let value = new Uint32Array(event.target.value);
   console.log("Error status = " + value);
 }
      
 function onErrorMessageChanged(event) {
-  let value = Uint8Array(event.target.value);
+  let value = new Uint8Array(event.target.value);
   let utf8Decoder = new TextDecoder();
   let errorMessage = utf8Decoder.decode(value);
   console.log("Error message = " + errorMessage);
