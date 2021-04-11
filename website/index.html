@@ -48,6 +48,18 @@ if ("bluetooth" in navigator) {
   alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
 }
 
+function onErrorStatusChanged(event) {
+  let value = Uint32Array(event.target.value);
+  console.log("Error status = " + value);
+}
+     
+function onErrorMessageChanged(event) {
+  let value = Uint8Array(event.target.value);
+  let utf8Decoder = new TextDecoder();
+  let errorMessage = utf8Decoder.decode(value);
+  console.log("Error message = " + errorMessage);
+}
+
 async function connect() {
   msg('Requesting device ...');
 
@@ -73,7 +85,11 @@ async function connect() {
   fileChecksumCharacteristic = await service.getCharacteristic(FILE_CHECKSUM_UUID);
   commandCharacteristic = await service.getCharacteristic(COMMAND_UUID);
   errorStatusCharacteristic = await service.getCharacteristic(ERROR_STATUS_UUID);
+  await errorStatusCharacteristic.startNotifications();
+  errorStatusCharacteristic.addEventListener('characteristicvaluechanged', onErrorStatusChanged);
   errorMessageCharacteristic = await service.getCharacteristic(ERROR_MESSAGE_UUID);
+  await errorMessageCharacteristic.startNotifications();
+  errorMessageCharacteristic.addEventListener('characteristicvaluechanged', onErrorMessageChanged);
   
   transferFileButton.addEventListener('click', function(event) {
     msg('Trying to write file ...');
