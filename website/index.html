@@ -169,7 +169,7 @@ async function transferFile(fileLength) {
   let maximumLengthArray = new Uint32Array(maximumLengthValue.buffer);
   let maximumLength = maximumLengthArray[0];
   if (fileLength > maximumLength) {
-    msg("File length is too long: " + fileLength + " but maximum is " + maximumLength);
+    msg("File length is too long: " + fileLength + " bytes but maximum is " + maximumLength);
     return;
   }
   
