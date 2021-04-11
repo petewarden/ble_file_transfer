@@ -134,7 +134,7 @@ function crc32ForByte(r) {
 function crc32(data) {
   const tableSize = 256;
   if (!window.crc32Table) {
-    crc32Table = [];
+    crc32Table = new Uint32Array(tableSize);
     for(let i = 0; i < tableSize; ++i) {
       crc32Table[i] = crc32ForByte(i);
     }
