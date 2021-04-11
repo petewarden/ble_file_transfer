@@ -11,11 +11,12 @@
       <li>Click the connect button and pair with the board.</li>
       <li>Press the transfer file button.</li>
     </ul>
-    You should see the bytes remaining count down, and then a 'File transfer complete' message at the end.
+    You should see the bytes remaining count down, and then a 'File transfer succeeded' message at the end.
   </div>
   <div>
     <button id="connect-button">Connect</button>
     <button id="transfer-file-button">Transfer File</button>
+    <button id="cancel-transfer-button">Cancel Transfer</button>
     <div id="status-label">Click button to connect to the board</div>
   </div>  
 </body>
@@ -26,13 +27,13 @@ const FILE_LENGTH_UUID = 'bf88b656-3001-4a61-86e0-769c741026c0';
 const FILE_MAXIMUM_LENGTH_UUID = 'bf88b656-3002-4a61-86e0-769c741026c0';
 const FILE_CHECKSUM_UUID = 'bf88b656-3003-4a61-86e0-769c741026c0';
 const COMMAND_UUID = 'bf88b656-3004-4a61-86e0-769c741026c0';
-const ERROR_STATUS_UUID = 'bf88b656-3005-4a61-86e0-769c741026c0';
+const TRANSFER_STATUS_UUID = 'bf88b656-3005-4a61-86e0-769c741026c0';
 const ERROR_MESSAGE_UUID = 'bf88b656-3006-4a61-86e0-769c741026c0';
      
 const connectButton = document.getElementById('connect-button');
 const transferFileButton = document.getElementById('transfer-file-button');
+const cancelTransferButton = document.getElementById('cancel-transfer-button');
 const statusElement = document.getElementById('status-label');
-var fileBlockCharacteristic = null;
 
 function msg(m){
   statusElement.innerHTML = m;
@@ -44,8 +45,44 @@ if ("bluetooth" in navigator) {
   });
   // else the browser doesn't support bluetooth
 } else {
-  msg("Browser not supported");
-  alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
+  msg('Browser not supported');
+  alert('Error: This browser doesn\'t support Web Bluetooth. Try using Chrome.');
+}
+
+async function onTransferSuccess() {
+  isFileTransferInProgress = false;
+  let checksumValue = await fileChecksumCharacteristic.readValue();
+  let checksumArray = new Uint32Array(checksumValue.buffer);
+  let checksum = checksumArray[0];
+  msg('File transfer succeeded: Checksum 0x' + checksum.toString(16));
+}
+
+function onTransferError() {
+  isFileTransferInProgress = false;
+  msg("File transfer error");  
+}
+     
+function onTransferInProgress() {
+  isFileTransferInProgress = true; 
+}
+
+function onTransferStatusChanged(event) {
+  let value = new Uint32Array(event.target.value.buffer);
+  let statusCode = value[0];
+  if (statusCode === 0) {
+    onTransferSuccess();
+  } else  if (statusCode === 1) {
+    onTransferError();
+  } else if (statusCode === 2) {
+    onTransferInProgress(); 
+  }
+}
+     
+function onErrorMessageChanged(event) {
+  let value = new Uint8Array(event.target.value.buffer);
+  let utf8Decoder = new TextDecoder();
+  let errorMessage = utf8Decoder.decode(value);
+  console.log("Error message = " + errorMessage);
 }
 
 async function connect() {
@@ -55,7 +92,6 @@ async function connect() {
     filters: [{services: [SERVICE_UUID]}]
   });
 
-  
   msg('Connecting to device ...');
   function onDisconnected(event) {
     msg('Device ' + device.name + ' is disconnected.');
@@ -72,62 +108,118 @@ async function connect() {
   fileMaximumLengthCharacteristic = await service.getCharacteristic(FILE_MAXIMUM_LENGTH_UUID);
   fileChecksumCharacteristic = await service.getCharacteristic(FILE_CHECKSUM_UUID);
   commandCharacteristic = await service.getCharacteristic(COMMAND_UUID);
-  errorStatusCharacteristic = await service.getCharacteristic(ERROR_STATUS_UUID);
+  transferStatusCharacteristic = await service.getCharacteristic(TRANSFER_STATUS_UUID);
+  await transferStatusCharacteristic.startNotifications();
+  transferStatusCharacteristic.addEventListener('characteristicvaluechanged', onTransferStatusChanged);
   errorMessageCharacteristic = await service.getCharacteristic(ERROR_MESSAGE_UUID);
+  await errorMessageCharacteristic.startNotifications();
+  errorMessageCharacteristic.addEventListener('characteristicvaluechanged', onErrorMessageChanged);
   
   transferFileButton.addEventListener('click', function(event) {
     msg('Trying to write file ...');
     transferFile(30 * 1024);
   });
+
+   cancelTransferButton.addEventListener('click', function(event) {
+    msg('Trying to cancel transfer ...');
+    cancelTransfer();
+  });
+
+  isFileTransferInProgress = false;
   
   msg('Connected to device');
 }
 
-function computeChecksum() {
-  return 0;
+function prepareDummyFileContents(fileLength) {
+  let result = new ArrayBuffer(fileLength);
+  let bytes = new Uint8Array(result);
+  const contentString = 'The quick brown fox jumped over the lazy dog. ';
+  for (var i = 0; i < bytes.length; ++i) {
+    var contentIndex = (i % contentString.length);
+    bytes[i] = contentString.charCodeAt(contentIndex);
+  }
+  return result;
 }
      
+// See http://home.thep.lu.se/~bjorn/crc/ for more information on simple CRC32 calculations.
+function crc32ForByte(r) {
+  for (let j = 0; j < 8; ++j) {
+    r = (r & 1? 0: 0xedb88320) ^ r >>> 1;
+  }
+  return r ^ 0xff000000;
+}
+
+function crc32(dataIterable) {
+  const tableSize = 256;
+  if (!window.crc32Table) {
+    crc32Table = new Uint32Array(tableSize);
+    for(let i = 0; i < tableSize; ++i) {
+      crc32Table[i] = crc32ForByte(i);
+    }
+    window.crc32Table = crc32Table;
+  }
+  let dataBytes = new Uint8Array(dataIterable);
+  let crc = 0;
+  for(let i = 0; i < dataBytes.byteLength; ++i) {
+    const crcLowByte = (crc & 0x000000ff);
+    const dataByte = dataBytes[i];
+    const tableIndex = crcLowByte ^ dataByte;
+    // The last >>> is to convert this into an unsigned 32-bit integer.
+    crc = (window.crc32Table[tableIndex] ^ (crc >>> 8)) >>> 0;
+  }
+  return crc;
+}
+
+// This is a small test function for the CRC32 implementation, not normally called but left in
+// for debugging purposes. We know the expected CRC32 of [97, 98, 99, 100, 101] is 2240272485,
+// or 0x8587d865, so if anything else is output we know there's an error in the implementation.
+function testCrc32() {
+  const testArray = [97, 98, 99, 100, 101];
+  const testArrayCrc32 = crc32(testArray);
+  console.log('CRC32 for [97, 98, 99, 100, 101] is 0x' + testArrayCrc32.toString(16) + ' (' + testArrayCrc32 + ')');
+}
+
 async function transferFile(fileLength) {
-  let maximumLength = fileMaximumLengthCharacteristic.readValue();
+  let maximumLengthValue = await fileMaximumLengthCharacteristic.readValue();
+  let maximumLengthArray = new Uint32Array(maximumLengthValue.buffer);
+  let maximumLength = maximumLengthArray[0];
   if (fileLength > maximumLength) {
-    msg("File length is too long");
+    msg("File length is too long: " + fileLength + " bytes but maximum is " + maximumLength);
+    return;
   }
   
-  let fileLengthArray = Int32Array.of(fileLength);
+  if (isFileTransferInProgress) {
+    msg("Another file transfer is already in progress");
+    return;
+  }
+  
+  let fileContents = prepareDummyFileContents(fileLength);
+
+  let fileLengthArray = Int32Array.of(fileContents.byteLength);
   await fileLengthCharacteristic.writeValue(fileLengthArray);
-  let fileChecksum = computeChecksum();
+  let fileChecksum = crc32(fileContents);
   let fileChecksumArray = Uint32Array.of(fileChecksum);
   await fileChecksumCharacteristic.writeValue(fileChecksumArray);
   
   let commandArray = Int32Array.of(1);
   await commandCharacteristic.writeValue(commandArray);
-  
-  let errorStatus = await errorStatusCharacteristic.readValue();
-  if (errorStatus.getInt32(0) !== 0) {
-    let errorMessage = await errorMessageCharacteristic.readValue();
-    console.log("Error: ", errorMessage);
-  }
-  
-  sendFileBlock(fileLength);
+    
+  sendFileBlock(fileContents, 0);
 }
-     
-async function sendFileBlock(bytesRemaining) {
-  const blockLen = 128;
-  var blockBuffer = new ArrayBuffer(blockLen);
-  var blockView = new Uint8Array(blockBuffer);
-  const contentString = 'The quick brown fox jumped over the lazy dog';
-  for (var i = 0; i < blockLen; ++i) {
-    var contentIndex = (i % contentString.length);
-    blockView[i] = contentString.charCodeAt(contentIndex);
-  }
-  fileBlockCharacteristic.writeValue(blockBuffer)
+
+async function sendFileBlock(fileContents, bytesAlreadySent) {
+  let bytesRemaining = fileContents.byteLength - bytesAlreadySent;
+  
+  const maxBlockLength = 128;
+  const blockLength = Math.min(bytesRemaining, maxBlockLength);
+  var blockView = new Uint8Array(fileContents, bytesAlreadySent, blockLength);
+  fileBlockCharacteristic.writeValue(blockView)
   .then(_ => {
-    bytesRemaining -= blockLen;
-    msg('File block written - ' + bytesRemaining +' bytes remaining');
-    if (bytesRemaining > 0) {
-      sendFileBlock(bytesRemaining);
-    } else {
-      msg('File transfer complete');
+    bytesRemaining -= blockLength;
+    if ((bytesRemaining > 0) && isFileTransferInProgress) {
+      msg('File block written - ' + bytesRemaining +' bytes remaining');
+      bytesAlreadySent += blockLength;
+      sendFileBlock(fileContents, bytesAlreadySent);
     }
   })
   .catch(error => {
@@ -135,5 +227,10 @@ async function sendFileBlock(bytesRemaining) {
     msg('File block write error with ' + bytesRemaining + ' bytes remaining, see console');
   });
 }
+
+async function cancelTransfer() {  
+  let commandArray = Int32Array.of(2);
+  await commandCharacteristic.writeValue(commandArray);
+} 
   </script>
 </html>
