@@ -123,27 +123,50 @@ function prepareDummyFileContents(fileLength) {
   return result;
 }
      
-function computeChecksum() {
-  return 0;
+// See http://home.thep.lu.se/~bjorn/crc/ for more information on simple CRC32 calculations.
+function crc32ForByte(r) {
+  for (let j = 0; j < 8; ++j) {
+    r = (r & 1? 0: 0xedb88320) ^ r >>> 1;
+  }
+  return r ^ 0xff000000;
 }
-     
+
+function crc32(data) {
+  const tableSize = 256;
+  if (!window.crc32Table) {
+    crc32Table = [];
+    for(let i = 0; i < tableSize; ++i) {
+      crc32Table[i] = crc32ForByte(i);
+    }
+    window.crc32Table = crc32Table;
+  }
+  let crc = 0;
+  for(let i = 0; i < data.bytesLength; ++i) {
+    const crcLowByte = (crc & 0x000000ff);
+    const data_byte = data[i];
+    const table_index = crc_low_byte ^ data_byte;
+    crc = table[table_index] ^ (crc >> 8);
+  }
+  return crc;
+}
+
 async function transferFile(fileLength) {
   let maximumLength = fileMaximumLengthCharacteristic.readValue();
   if (fileLength > maximumLength) {
     msg("File length is too long");
   }
   
-  let fileLengthArray = Int32Array.of(fileLength);
+  let fileContents = prepareDummyFileContents(fileLength);
+
+  let fileLengthArray = Int32Array.of(fileContents.bytesLength);
   await fileLengthCharacteristic.writeValue(fileLengthArray);
-  let fileChecksum = computeChecksum();
+  let fileChecksum = crc32(fileContents);
   let fileChecksumArray = Uint32Array.of(fileChecksum);
   await fileChecksumCharacteristic.writeValue(fileChecksumArray);
   
   let commandArray = Int32Array.of(1);
   await commandCharacteristic.writeValue(commandArray);
-  
-  let fileContents = prepareDummyFileContents(fileLength);
-  
+    
   sendFileBlock(fileContents, 0);
 }
      
