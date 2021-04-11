@@ -166,7 +166,7 @@ function testCrc32() {
 
 async function transferFile(fileLength) {
   let maximumLengthValue = await fileMaximumLengthCharacteristic.readValue();
-  let maximumLengthArray = new UintArray(maximumLengthValue);
+  let maximumLengthArray = new Uint32Array(maximumLengthValue);
   let maximumLength = maximumLengthArray[0];
   if (fileLength > maximumLength) {
     msg("File length is too long");
