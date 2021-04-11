@@ -160,8 +160,6 @@ async function sendFileBlock(fileContents, bytesAlreadySent) {
     if (bytesRemaining > 0) {
       bytesAlreadySent += blockLength;
       sendFileBlock(fileContents, bytesAlreadySent);
-    } else {
-      msg('File transfer complete');
     }
   })
   .catch(error => {
