@@ -216,7 +216,7 @@ async function sendFileBlock(fileContents, bytesAlreadySent) {
   fileBlockCharacteristic.writeValue(blockView)
   .then(_ => {
     bytesRemaining -= blockLength;
-    if (bytesRemaining > 0) {
+    if ((bytesRemaining > 0) && isFileTransferInProgress) {
       msg('File block written - ' + bytesRemaining +' bytes remaining');
       bytesAlreadySent += blockLength;
       sendFileBlock(fileContents, bytesAlreadySent);
