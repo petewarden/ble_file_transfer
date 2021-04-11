@@ -16,6 +16,7 @@
   <div>
     <button id="connect-button">Connect</button>
     <button id="transfer-file-button">Transfer File</button>
+    <button id="cancel-transfer-button">Cancel Transfer</button>
     <div id="status-label">Click button to connect to the board</div>
   </div>  
 </body>
@@ -31,8 +32,8 @@ const ERROR_MESSAGE_UUID = 'bf88b656-3006-4a61-86e0-769c741026c0';
      
 const connectButton = document.getElementById('connect-button');
 const transferFileButton = document.getElementById('transfer-file-button');
+const cancelTransferButton = document.getElementById('cancel-transfer-button');
 const statusElement = document.getElementById('status-label');
-var fileBlockCharacteristic = null;
 
 function msg(m){
   statusElement.innerHTML = m;
@@ -49,6 +50,7 @@ if ("bluetooth" in navigator) {
 }
 
 async function onTransferSuccess() {
+  isFileTransferInProgress = false;
   let checksumValue = await fileChecksumCharacteristic.readValue();
   let checksumArray = new Uint32Array(checksumValue);
   let checksum = ChecksumArray[0];
@@ -56,7 +58,12 @@ async function onTransferSuccess() {
 }
 
 function onTransferError() {
+  isFileTransferInProgress = false;
   msg("File transfer error");  
+}
+     
+function onTransferInProgress() {
+  isFileTransferInProgress = true; 
 }
 
 function onTransferStatusChanged(event) {
@@ -64,8 +71,10 @@ function onTransferStatusChanged(event) {
   let statusCode = value[0];
   if (statusCode === 0) {
     onTransferSuccess();
-  } else {
+  } else  if (statusCode === 1) {
     onTransferError();
+  } else if (statusCode === 2) {
+    onTransferInProgress(); 
   }
 }
      
@@ -83,7 +92,6 @@ async function connect() {
     filters: [{services: [SERVICE_UUID]}]
   });
 
-  
   msg('Connecting to device ...');
   function onDisconnected(event) {
     msg('Device ' + device.name + ' is disconnected.');
@@ -111,6 +119,13 @@ async function connect() {
     msg('Trying to write file ...');
     transferFile(30 * 1024);
   });
+
+   cancelTransferButton.addEventListener('click', function(event) {
+    msg('Trying to cancel transfer ...');
+    cancelTransfer();
+  });
+
+  isFileTransferInProgress = false;
   
   msg('Connected to device');
 }
@@ -173,6 +188,11 @@ async function transferFile(fileLength) {
     return;
   }
   
+  if (isFileTransferInProgress) {
+    msg("Another file transfer is already in progress");
+    return;
+  }
+  
   let fileContents = prepareDummyFileContents(fileLength);
 
   let fileLengthArray = Int32Array.of(fileContents.byteLength);
@@ -186,7 +206,7 @@ async function transferFile(fileLength) {
     
   sendFileBlock(fileContents, 0);
 }
-     
+
 async function sendFileBlock(fileContents, bytesAlreadySent) {
   let bytesRemaining = fileContents.byteLength - bytesAlreadySent;
   
@@ -207,5 +227,10 @@ async function sendFileBlock(fileContents, bytesAlreadySent) {
     msg('File block write error with ' + bytesRemaining + ' bytes remaining, see console');
   });
 }
+
+async function cancelTransfer() {  
+  let commandArray = Int32Array.of(2);
+  await commandCharacteristic.writeValue(commandArray);
+} 
   </script>
 </html>
