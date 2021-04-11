@@ -132,7 +132,6 @@ function crc32ForByte(r) {
 }
 
 function crc32(dataIterable) {
-  let data = ArrayBuffer(dataIterable);
   const tableSize = 256;
   if (!window.crc32Table) {
     crc32Table = new Uint32Array(tableSize);
@@ -141,12 +140,14 @@ function crc32(dataIterable) {
     }
     window.crc32Table = crc32Table;
   }
+  let dataBuffer = ArrayBuffer(dataIterable);
+  let dataBytes = Uint8Array(dataBuffer);
   let crc = 0;
   for(let i = 0; i < data.byteLength; ++i) {
     const crcLowByte = (crc & 0x000000ff);
-    const data_byte = data[i];
-    const table_index = crcLowByte ^ data_byte;
-    crc = window.crc32Table[table_index] ^ (crc >> 8);
+    const dataByte = dataBytes[i];
+    const tableIndex = crcLowByte ^ dataByte;
+    crc = window.crc32Table[tableIndex] ^ (crc >> 8);
   }
   return crc;
 }
