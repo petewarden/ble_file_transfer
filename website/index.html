@@ -48,7 +48,7 @@ if ("bluetooth" in navigator) {
   alert('Error: This browser doesn\'t support Web Bluetooth. Try using Chrome.');
 }
 
-function onTransferSuccess() {
+async function onTransferSuccess() {
   let checksumValue = await fileChecksumCharacteristic.readValue();
   let checksumArray = new Uint32Array(checksumValue);
   let checksum = ChecksumArray[0];
