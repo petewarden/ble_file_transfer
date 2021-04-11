@@ -125,17 +125,18 @@ async function transferFile(fileLength) {
 }
      
 async function sendFileBlock(fileContents, bytesAlreadySent) {
-  const bytesRemaining = fileContents.length - bytesAlreadySent;
+  let bytesRemaining = fileContents.length - bytesAlreadySent;
   
   const maxBlockLength = 128;
   const blockLength = Math.min(bytesRemaining, maxBlockLength);
   var blockView = new Uint8Array(fileContents, bytesAlreadySent, blockLength);
   fileBlockCharacteristic.writeValue(blockView)
   .then(_ => {
-    bytesRemaining -= blockLen;
+    bytesRemaining -= blockLength;
     msg('File block written - ' + bytesRemaining +' bytes remaining');
     if (bytesRemaining > 0) {
-      sendFileBlock(bytesRemaining);
+      bytesAlreadySent += blockLength;
+      sendFileBlock(fileContents, bytesAlreadySent);
     } else {
       msg('File transfer complete');
     }
