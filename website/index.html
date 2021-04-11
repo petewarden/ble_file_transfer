@@ -129,8 +129,13 @@ async function sendFileBlock(fileContents, bytesAlreadySent) {
   
   const maxBlockLength = 128;
   const blockLength = Math.min(bytesRemaining, maxBlockLength);
-  var blockView = new Uint8Array(fileContents, bytesAlreadySent, blockLength);
-  fileBlockCharacteristic.writeValue(blockView)
+  var originalBlockView = new Uint8Array(fileContents, bytesAlreadySent, blockLength);
+  var copyBlockBuffer = new ArrayBuffer(blockLength);
+  var copyBlockView = new Uint8Array(copyBlockBuffer);
+  for (var i = 0; i < blockLength; ++i) {
+    copyBlockView[i] = originalBlockView[i];
+  }
+  fileBlockCharacteristic.writeValue(copyBlockView)
   .then(_ => {
     bytesRemaining -= blockLength;
     msg('File block written - ' + bytesRemaining +' bytes remaining');
