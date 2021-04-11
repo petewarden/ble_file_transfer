@@ -26,7 +26,7 @@ const FILE_LENGTH_UUID = 'bf88b656-3001-4a61-86e0-769c741026c0';
 const FILE_MAXIMUM_LENGTH_UUID = 'bf88b656-3002-4a61-86e0-769c741026c0';
 const FILE_CHECKSUM_UUID = 'bf88b656-3003-4a61-86e0-769c741026c0';
 const COMMAND_UUID = 'bf88b656-3004-4a61-86e0-769c741026c0';
-const ERROR_STATUS_UUID = 'bf88b656-3005-4a61-86e0-769c741026c0';
+const TRANSFER_STATUS_UUID = 'bf88b656-3005-4a61-86e0-769c741026c0';
 const ERROR_MESSAGE_UUID = 'bf88b656-3006-4a61-86e0-769c741026c0';
      
 const connectButton = document.getElementById('connect-button');
@@ -48,9 +48,22 @@ if ("bluetooth" in navigator) {
   alert("Error: This browser doesn't support Web Bluetooth. Try using Chrome.");
 }
 
-function onErrorStatusChanged(event) {
+function onTransferSuccess() {
+  msg("File transfer succeeded");
+}
+
+function onTransferError() {
+  msg("File transfer error");  
+}
+
+function onTransferStatusChanged(event) {
   let value = new Uint32Array(event.target.value.buffer);
-  console.log("Error status = " + value);
+  let statusCode = value[0];
+  if (statusCode === 0) {
+    onTransferSuccess();
+  } else {
+    onTransferError();
+  }
 }
      
 function onErrorMessageChanged(event) {
@@ -84,9 +97,9 @@ async function connect() {
   fileMaximumLengthCharacteristic = await service.getCharacteristic(FILE_MAXIMUM_LENGTH_UUID);
   fileChecksumCharacteristic = await service.getCharacteristic(FILE_CHECKSUM_UUID);
   commandCharacteristic = await service.getCharacteristic(COMMAND_UUID);
-  errorStatusCharacteristic = await service.getCharacteristic(ERROR_STATUS_UUID);
-  await errorStatusCharacteristic.startNotifications();
-  errorStatusCharacteristic.addEventListener('characteristicvaluechanged', onErrorStatusChanged);
+  transferStatusCharacteristic = await service.getCharacteristic(ERROR_STATUS_UUID);
+  await transferStatusCharacteristic.startNotifications();
+  transferStatusCharacteristic.addEventListener('characteristicvaluechanged', onTransferStatusChanged);
   errorMessageCharacteristic = await service.getCharacteristic(ERROR_MESSAGE_UUID);
   await errorMessageCharacteristic.startNotifications();
   errorMessageCharacteristic.addEventListener('characteristicvaluechanged', onErrorMessageChanged);
@@ -128,12 +141,6 @@ async function transferFile(fileLength) {
   
   let commandArray = Int32Array.of(1);
   await commandCharacteristic.writeValue(commandArray);
-  
-  let errorStatus = await errorStatusCharacteristic.readValue();
-  if (errorStatus.getInt32(0) !== 0) {
-    let errorMessage = await errorMessageCharacteristic.readValue();
-    console.log("Error: ", errorMessage);
-  }
   
   let fileContents = prepareDummyFileContents(fileLength);
   
