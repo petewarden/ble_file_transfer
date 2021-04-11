@@ -121,11 +121,11 @@ async function transferFile(fileLength) {
   
   let fileContents = prepareDummyFileContents(fileLength);
   
-  sendFileBlock(fileContents, fileContents.length);
+  sendFileBlock(fileContents, fileContents.byteLength);
 }
      
 async function sendFileBlock(fileContents, bytesAlreadySent) {
-  let bytesRemaining = fileContents.length - bytesAlreadySent;
+  let bytesRemaining = fileContents.byteLength - bytesAlreadySent;
   
   const maxBlockLength = 128;
   const blockLength = Math.min(bytesRemaining, maxBlockLength);
