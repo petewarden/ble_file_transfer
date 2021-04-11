@@ -140,8 +140,7 @@ function crc32(dataIterable) {
     }
     window.crc32Table = crc32Table;
   }
-  let dataBuffer = new ArrayBuffer(dataIterable);
-  let dataBytes = new Uint8Array(dataBuffer);
+  let dataBytes = new Uint8Array(dataIterable);
   let crc = 0;
   for(let i = 0; i < dataBytes.byteLength; ++i) {
     const crcLowByte = (crc & 0x000000ff);
