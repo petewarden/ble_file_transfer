@@ -141,7 +141,7 @@ function crc32(data) {
     window.crc32Table = crc32Table;
   }
   let crc = 0;
-  for(let i = 0; i < data.bytesLength; ++i) {
+  for(let i = 0; i < data.byteLength; ++i) {
     const crcLowByte = (crc & 0x000000ff);
     const data_byte = data[i];
     const table_index = crc_low_byte ^ data_byte;
@@ -158,7 +158,7 @@ async function transferFile(fileLength) {
   
   let fileContents = prepareDummyFileContents(fileLength);
 
-  let fileLengthArray = Int32Array.of(fileContents.bytesLength);
+  let fileLengthArray = Int32Array.of(fileContents.byteLength);
   await fileLengthCharacteristic.writeValue(fileLengthArray);
   let fileChecksum = crc32(fileContents);
   let fileChecksumArray = Uint32Array.of(fileChecksum);
