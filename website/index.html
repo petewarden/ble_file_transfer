@@ -144,14 +144,14 @@ function crc32(dataIterable) {
   let crc = 0;
   for(let i = 0; i < dataBytes.byteLength; ++i) {
     const crcLowByte = (crc & 0x000000ff);
-    console.log('crcLowByte[' + i + ']=' + crcLowByte);
+//    console.log('crcLowByte[' + i + ']=' + crcLowByte);
     const dataByte = dataBytes[i];
-    console.log('dataByte[' + i + ']=' + dataByte);
+//    console.log('dataByte[' + i + ']=' + dataByte);
     const tableIndex = crcLowByte ^ dataByte;
-    console.log('tableIndex[' + i + ']=' + tableIndex);
+//    console.log('tableIndex[' + i + ']=' + tableIndex);
     // The last >>> is to convert this into an unsigned 32-bit integer.
     crc = (window.crc32Table[tableIndex] ^ (crc >>> 8)) >>> 0;
-    console.log('crc[' + i + ']=' + crc);
+//    console.log('crc[' + i + ']=' + crc);
   }
   return crc;
 }
