@@ -35,20 +35,43 @@ const transferFileButton = document.getElementById('transfer-file-button');
 const cancelTransferButton = document.getElementById('cancel-transfer-button');
 const statusElement = document.getElementById('status-label');
 
-function msg(m){
-  statusElement.innerHTML = m;
-}
-     
-if ("bluetooth" in navigator) {
-  connectButton.addEventListener('click', function(event) {
-    connect();
-  });
-  // else the browser doesn't support bluetooth
-} else {
+// Check that the browser supports WebBLE, and raise a warning if not.
+if (!("bluetooth" in navigator)) {
   msg('Browser not supported');
   alert('Error: This browser doesn\'t support Web Bluetooth. Try using Chrome.');
 }
 
+// This is a simple demonstration of how to use WebBLE to transfer tens of kilobytes
+// of data to an Arduino Nano BLE board with the corresponding sketch installed.
+//
+// The basic API is that you call connect() to prompt the user to pair with the board,
+// then transferFile() with the data you want to send. If it completes successfully
+// then onTransferSuccess() will be called, otherwise onTransferError() will be
+// invoked. Progress information is reported by the msg() function, and there's a
+// human-readable explanation of any error in onErrorMessageChanged().
+//
+// The file transfer process is verified using a CRC32 checksum, which you can also
+// choose to read before sending a file if you want to tell if it's already been sent.
+     
+connectButton.addEventListener('click', function(event) {
+  connect();
+  transferFileButton.addEventListener('click', function(event) {
+    msg('Trying to write file ...');
+    // You'll want to replace this with the data you want to transfer.
+    let fileContents = prepareDummyFileContents(30 * 1024);
+    transferFile(fileContents);
+  });
+  cancelTransferButton.addEventListener('click', function(event) {
+    msg('Trying to cancel transfer ...');
+    cancelTransfer();
+  });
+});
+
+// ------------------------------------------------------------------------------
+// This section contains functions you may want to customize for your own page.
+     
+// You'll want to replace these two functions with your own logic, to take what
+// actions your application needs when a file transfer succeeds, or errors out.
 async function onTransferSuccess() {
   isFileTransferInProgress = false;
   let checksumValue = await fileChecksumCharacteristic.readValue();
@@ -57,27 +80,14 @@ async function onTransferSuccess() {
   msg('File transfer succeeded: Checksum 0x' + checksum.toString(16));
 }
 
+// Called when something has gone wrong with a file transfer.
 function onTransferError() {
   isFileTransferInProgress = false;
   msg("File transfer error");  
 }
-     
-function onTransferInProgress() {
-  isFileTransferInProgress = true; 
-}
 
-function onTransferStatusChanged(event) {
-  let value = new Uint32Array(event.target.value.buffer);
-  let statusCode = value[0];
-  if (statusCode === 0) {
-    onTransferSuccess();
-  } else  if (statusCode === 1) {
-    onTransferError();
-  } else if (statusCode === 2) {
-    onTransferInProgress(); 
-  }
-}
-     
+// Called when an error message is received from the device. This describes what
+// went wrong with the transfer in a user-readable form.
 function onErrorMessageChanged(event) {
   let value = new Uint8Array(event.target.value.buffer);
   let utf8Decoder = new TextDecoder();
@@ -85,6 +95,16 @@ function onErrorMessageChanged(event) {
   console.log("Error message = " + errorMessage);
 }
 
+// Display logging information in the interface, you'll want to customize this
+// for your page.
+function msg(m){
+  statusElement.innerHTML = m;
+}
+
+// ------------------------------------------------------------------------------
+// This section has the public APIs for the transfer process, which you
+// shouldn't need to modify but will have to call.
+          
 async function connect() {
   msg('Requesting device ...');
 
@@ -115,19 +135,60 @@ async function connect() {
   await errorMessageCharacteristic.startNotifications();
   errorMessageCharacteristic.addEventListener('characteristicvaluechanged', onErrorMessageChanged);
   
-  transferFileButton.addEventListener('click', function(event) {
-    msg('Trying to write file ...');
-    transferFile(30 * 1024);
-  });
-
-   cancelTransferButton.addEventListener('click', function(event) {
-    msg('Trying to cancel transfer ...');
-    cancelTransfer();
-  });
-
   isFileTransferInProgress = false;
   
   msg('Connected to device');
+}
+
+async function transferFile(fileContents) {
+  let maximumLengthValue = await fileMaximumLengthCharacteristic.readValue();
+  let maximumLengthArray = new Uint32Array(maximumLengthValue.buffer);
+  let maximumLength = maximumLengthArray[0];
+  if (fileContents.byteLength > maximumLength) {
+    msg("File length is too long: " + fileContents.byteLength + " bytes but maximum is " + maximumLength);
+    return;
+  }
+  
+  if (isFileTransferInProgress) {
+    msg("Another file transfer is already in progress");
+    return;
+  }
+  
+  let fileLengthArray = Int32Array.of(fileContents.byteLength);
+  await fileLengthCharacteristic.writeValue(fileLengthArray);
+  let fileChecksum = crc32(fileContents);
+  let fileChecksumArray = Uint32Array.of(fileChecksum);
+  await fileChecksumCharacteristic.writeValue(fileChecksumArray);
+  
+  let commandArray = Int32Array.of(1);
+  await commandCharacteristic.writeValue(commandArray);
+    
+  sendFileBlock(fileContents, 0);
+}
+     
+async function cancelTransfer() {  
+  let commandArray = Int32Array.of(2);
+  await commandCharacteristic.writeValue(commandArray);
+} 
+
+// ------------------------------------------------------------------------------
+// The rest of these functions are internal implementation details, and shouldn't
+// be called by users of this module.
+     
+function onTransferInProgress() {
+  isFileTransferInProgress = true; 
+}
+   
+function onTransferStatusChanged(event) {
+  let value = new Uint32Array(event.target.value.buffer);
+  let statusCode = value[0];
+  if (statusCode === 0) {
+    onTransferSuccess();
+  } else  if (statusCode === 1) {
+    onTransferError();
+  } else if (statusCode === 2) {
+    onTransferInProgress(); 
+  }
 }
 
 function prepareDummyFileContents(fileLength) {
@@ -179,34 +240,6 @@ function testCrc32() {
   console.log('CRC32 for [97, 98, 99, 100, 101] is 0x' + testArrayCrc32.toString(16) + ' (' + testArrayCrc32 + ')');
 }
 
-async function transferFile(fileLength) {
-  let maximumLengthValue = await fileMaximumLengthCharacteristic.readValue();
-  let maximumLengthArray = new Uint32Array(maximumLengthValue.buffer);
-  let maximumLength = maximumLengthArray[0];
-  if (fileLength > maximumLength) {
-    msg("File length is too long: " + fileLength + " bytes but maximum is " + maximumLength);
-    return;
-  }
-  
-  if (isFileTransferInProgress) {
-    msg("Another file transfer is already in progress");
-    return;
-  }
-  
-  let fileContents = prepareDummyFileContents(fileLength);
-
-  let fileLengthArray = Int32Array.of(fileContents.byteLength);
-  await fileLengthCharacteristic.writeValue(fileLengthArray);
-  let fileChecksum = crc32(fileContents);
-  let fileChecksumArray = Uint32Array.of(fileChecksum);
-  await fileChecksumCharacteristic.writeValue(fileChecksumArray);
-  
-  let commandArray = Int32Array.of(1);
-  await commandCharacteristic.writeValue(commandArray);
-    
-  sendFileBlock(fileContents, 0);
-}
-
 async function sendFileBlock(fileContents, bytesAlreadySent) {
   let bytesRemaining = fileContents.byteLength - bytesAlreadySent;
   
@@ -227,10 +260,5 @@ async function sendFileBlock(fileContents, bytesAlreadySent) {
     msg('File block write error with ' + bytesRemaining + ' bytes remaining, see console');
   });
 }
-
-async function cancelTransfer() {  
-  let commandArray = Int32Array.of(2);
-  await commandCharacteristic.writeValue(commandArray);
-} 
   </script>
 </html>
