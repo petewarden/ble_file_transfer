@@ -10,26 +10,52 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+// This is part of a simple demonstration of how to transfer small (tens of
+// kilobytes) files over BLE onto an Arduino Nano BLE Sense board. Most of this
+// sketch is internal implementation details of the protocol, but if you just
+// want to use it you can look at the bottom of this file.
+// The API is that you call setupBLEFileTransfer() in your setup() function to
+// open up communication with any clients that want to send you files, and then
+// onBLEFileReceived() is called when a file has been downloaded.
+
 #include <ArduinoBLE.h>
 
 // Comment this macro back in to log received data to the serial UART.
 //#define ENABLE_LOGGING
 
-#define FILE_TRANSFER_UUID(val) ("bf88b656-" val "-4a61-86e0-769c741026c0")
+// Forward declare the function that will be called when data has been delivered to us.
+void onBLEFileReceived(uint8_t* file_data, int file_length);
 
 namespace {
-  
+
+// Controls how large a file the board can receive. We double-buffer the files
+// as they come in, so you'll need twice this amount of RAM. The default is set
+// to 50KB.
+constexpr int32_t file_maximum_byte_count = (50 * 1024);
+
+// Macro based on a master UUID that can be modified for each characteristic.
+#define FILE_TRANSFER_UUID(val) ("bf88b656-" val "-4a61-86e0-769c741026c0")
+
 BLEService service(FILE_TRANSFER_UUID("0000"));
 
-constexpr int32_t file_block_byte_count = 512;
+// How big each transfer block can be. In theory this could be up to 512 bytes, but
+// in practice I've found that going over 128 affects reliability of the connection.
+constexpr int32_t file_block_byte_count = 128;
+
+// Where each data block is written to during the transfer.
 BLECharacteristic file_block_characteristic(FILE_TRANSFER_UUID("3000"), BLEWrite, file_block_byte_count);
 
+// Write the expected total length of the file in bytes to this characteristic
+// before sending the command to transfer a file.
 BLECharacteristic file_length_characteristic(FILE_TRANSFER_UUID("3001"), BLERead | BLEWrite, sizeof(uint32_t));
 
+// Read-only attribute that defines how large a file the sketch can handle.
 BLECharacteristic file_maximum_length_characteristic(FILE_TRANSFER_UUID("3002"), BLERead, sizeof(uint32_t));
+
+// Write the checksum that you expect for the file here before you trigger the transfer.
 BLECharacteristic file_checksum_characteristic(FILE_TRANSFER_UUID("3003"), BLERead | BLEWrite, sizeof(uint32_t));
 
-// Sending a command of 1 starts a file transfer (the length and checksum characteristics should already have been set).
+// Writing a command of 1 starts a file transfer (the length and checksum characteristics should already have been set).
 // A command of 2 tries to cancel any pending file transfers. All other commands are undefined.
 BLECharacteristic command_characteristic(FILE_TRANSFER_UUID("3004"), BLEWrite, sizeof(uint32_t));
 
@@ -41,9 +67,7 @@ BLECharacteristic transfer_status_characteristic(FILE_TRANSFER_UUID("3005"), BLE
 constexpr int32_t error_message_byte_count = 128;
 BLECharacteristic error_message_characteristic(FILE_TRANSFER_UUID("3006"), BLERead | BLENotify, error_message_byte_count);
 
-String device_name;
-
-constexpr int32_t file_maximum_byte_count = (50 * 1024);
+// Internal globals used for transferring the file.
 uint8_t file_buffers[2][file_maximum_byte_count];
 int finished_file_buffer_index = -1;
 uint8_t* finished_file_buffer = nullptr;
@@ -151,6 +175,8 @@ void onFileTransferComplete() {
   in_progress_bytes_expected = 0;
 
   notifySuccess();
+
+  onBLEFileReceived(finished_file_buffer, finished_file_buffer_byte_count);
 }
 
 void onFileBlockWritten(BLEDevice central, BLECharacteristic characteristic) {  
@@ -259,28 +285,22 @@ void onCommandWritten(BLEDevice central, BLECharacteristic characteristic) {
 
 }
 
-}  // namespace
-
-void setup() {
-  // Start serial
-  Serial.begin(9600);
-  Serial.println("Started");
-
-
-  // Start BLE
+// Starts the BLE handling you need to support the file transfer.
+void setupBLEFileTransfer() {
+  // Start the core BLE engine.
   if (!BLE.begin()) {
     Serial.println("Failed to initialized BLE!");
     while (1);
   }
   String address = BLE.address();
 
-  // Output BLE settings over Serial
+  // Output BLE settings over Serial.
   Serial.print("address = ");
   Serial.println(address);
 
   address.toUpperCase();
 
-  device_name = "FileTransferExample-";
+  static String device_name = "FileTransferExample-";
   device_name += address[address.length() - 5];
   device_name += address[address.length() - 4];
   device_name += address[address.length() - 2];
@@ -289,10 +309,12 @@ void setup() {
   Serial.print("device_name = ");
   Serial.println(device_name);
 
+  // Set up properties for the whole service.
   BLE.setLocalName(device_name.c_str());
   BLE.setDeviceName(device_name.c_str());
   BLE.setAdvertisedService(service);
 
+  // Add in the characteristics we'll be making available.
   file_block_characteristic.setEventHandler(BLEWritten, onFileBlockWritten);
   service.addCharacteristic(file_block_characteristic);
 
@@ -309,19 +331,39 @@ void setup() {
   service.addCharacteristic(transfer_status_characteristic);
   service.addCharacteristic(error_message_characteristic);
 
+  // Start up the service itself.
   BLE.addService(service);
   BLE.advertise();
 }
 
-void loop() {
-  BLEDevice central = BLE.central();
-  
-  // if a central is connected to the peripheral:
+// Called in your loop function to handle BLE housekeeping.
+void updateBLEFileTransfer() {
+  BLEDevice central = BLE.central(); 
   static bool was_connected_last = false;  
   if (central && !was_connected_last) {
     Serial.print("Connected to central: ");
-    // print the central's BT address:
     Serial.println(central.address());
   }
   was_connected_last = central;  
+}
+
+}  // namespace
+
+void setup() {
+  // Start serial
+  Serial.begin(9600);
+  Serial.println("Started");
+
+  setupBLEFileTransfer();
+}
+
+void onBLEFileReceived(uint8_t* file_data, int file_length) {
+  // Do something here with the file data that you've received. The memory itself will
+  // remain untouched until after a following onFileReceived call has completed, and
+  // the BLE module retains ownership of it, so you don't need to deallocate it.
+}
+
+void loop() {
+  updateBLEFileTransfer();
+  // Your own code here.
 }
