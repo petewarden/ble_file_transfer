@@ -15,6 +15,8 @@
   </div>
   <div>
     <button id="connect-button">Connect</button>
+    <input type="file" id="file" />
+    <button id="read-file">Read File</button>
     <button id="transfer-file-button">Transfer File</button>
     <button id="cancel-transfer-button">Cancel Transfer</button>
     <div id="status-label">Click button to connect to the board</div>
@@ -195,11 +197,27 @@ function prepareDummyFileContents(fileLength) {
   let result = new ArrayBuffer(fileLength);
   let bytes = new Uint8Array(result);
   const contentString = 'The quick brown fox jumped over the lazy dog. ';
-  for (var i = 0; i < bytes.length; ++i) {
-    var contentIndex = (i % contentString.length);
-    bytes[i] = contentString.charCodeAt(contentIndex);
-  }
-  return result;
+  document.querySelector("#read-file").addEventListener('click', function() {
+	// no file selected to read
+	if(document.querySelector("#file").value == '') {
+		console.log('No file selected');
+		return;
+	}
+
+	var file = document.querySelector("#file").files[0];
+
+	var reader = new FileReader();
+	reader.onload = function(e) {
+		// binary data
+		console.log(e.target.result);
+	};
+	reader.onerror = function(e) {
+		// error occurred
+		console.log('Error : ' + e.type);
+	};
+	reader.readAsBinaryString(file);
+});
+  return reader.result;
 }
      
 // See http://home.thep.lu.se/~bjorn/crc/ for more information on simple CRC32 calculations.
